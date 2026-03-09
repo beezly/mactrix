@@ -253,7 +253,7 @@ extension MatrixClient: UI.ImageLoader {
         }
 
         do {
-            return try await Image(importing: imageData, contentType: imageData.computeMimeType())
+            return try imageData.toOrientedImage(contentType: imageData.computeMimeType())
         } catch {
             Logger.matrixClient.error("failed convert matrix media data to Image: \(error) \(imageData)")
             throw error

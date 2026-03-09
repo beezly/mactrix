@@ -89,7 +89,7 @@ struct MessageImageView: View {
             do {
                 let data = try await matrixClient.client.getMediaContent(mediaSource: content.source)
                 imageData = data
-                image = try await Image(importing: data, contentType: contentType)
+                image = try data.toOrientedImage(contentType: contentType)
             } catch {
                 errorMessage = error.localizedDescription
             }

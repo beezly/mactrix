@@ -16,16 +16,21 @@ public final class SidebarRoom: Identifiable {
 
     public init(room: MatrixRustSDK.Room) {
         self.room = room
+        listenToRoomInfo()
+    }
 
-        Task {
-            do {
-                roomInfo = try await room.roomInfo()
-            } catch {
-                Logger.SidebarRoom.error("Failed to fetch initial room info: \(error)")
-            }
+    private init(room: MatrixRustSDK.Room, initialRoomInfo: RoomInfo) {
+        self.room = room
+        self.roomInfo = initialRoomInfo
+        listenToRoomInfo()
+    }
 
-            listenToRoomInfo()
+    /// Creates a SidebarRoom with roomInfo pre-populated to avoid a nil flash on first render.
+    public static func make(room: MatrixRustSDK.Room) async -> SidebarRoom {
+        if let roomInfo = try? await room.roomInfo() {
+            return SidebarRoom(room: room, initialRoomInfo: roomInfo)
         }
+        return SidebarRoom(room: room)
     }
 
     private func listenToRoomInfo() {

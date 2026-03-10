@@ -21,13 +21,25 @@ extension MatrixClient {
             case let .insert(index, room):
                 self.rooms.insert(SidebarRoom(room: room), at: Int(index))
             case let .set(index, room):
-                self.rooms[Int(index)] = SidebarRoom(room: room)
+                let existing = self.rooms[Int(index)]
+                if existing.id == room.id() {
+                    existing.updateRoom(room)
+                } else {
+                    self.rooms[Int(index)] = SidebarRoom(room: room)
+                }
             case let .remove(index):
                 self.rooms.remove(at: Int(index))
             case let .truncate(length):
                 self.rooms.removeSubrange(Int(length) ..< self.rooms.count)
             case let .reset(values: values):
-                self.rooms = values.map(SidebarRoom.init(room:))
+                let existingById = Dictionary(self.rooms.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+                self.rooms = values.map { room in
+                    if let existing = existingById[room.id()] {
+                        existing.updateRoom(room)
+                        return existing
+                    }
+                    return SidebarRoom(room: room)
+                }
             }
         }
     }

@@ -12,9 +12,7 @@ public final class LiveRoom: Identifiable {
 
     @ObservationIgnored private var typingHandle: TaskHandle?
 
-    public nonisolated var room: MatrixRustSDK.Room {
-        sidebarRoom.room
-    }
+    public let room: MatrixRustSDK.Room
 
     public var roomInfo: MatrixRustSDK.RoomInfo? {
         sidebarRoom.roomInfo
@@ -26,6 +24,7 @@ public final class LiveRoom: Identifiable {
 
     public init(sidebarRoom: SidebarRoom) {
         self.sidebarRoom = sidebarRoom
+        self.room = sidebarRoom.room
 
         startListening()
 

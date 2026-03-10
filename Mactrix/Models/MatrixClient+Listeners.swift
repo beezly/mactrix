@@ -7,7 +7,7 @@ extension MatrixClient {
         for update in roomEntriesUpdate {
             switch update {
             case let .append(values):
-                self.rooms.append(contentsOf: values.map(SidebarRoom.init(room:)))
+                self.rooms.append(contentsOf: values.map { SidebarRoom(room: $0) })
             case .clear:
                 self.rooms.removeAll()
             case let .pushFront(room):
@@ -21,13 +21,17 @@ extension MatrixClient {
             case let .insert(index, room):
                 self.rooms.insert(SidebarRoom(room: room), at: Int(index))
             case let .set(index, room):
-                self.rooms[Int(index)] = SidebarRoom(room: room)
+                let existingRoomInfo = self.rooms[Int(index)].id == room.id() ? self.rooms[Int(index)].roomInfo : nil
+                self.rooms[Int(index)] = SidebarRoom(room: room, initialRoomInfo: existingRoomInfo)
             case let .remove(index):
                 self.rooms.remove(at: Int(index))
             case let .truncate(length):
                 self.rooms.removeSubrange(Int(length) ..< self.rooms.count)
             case let .reset(values: values):
-                self.rooms = values.map(SidebarRoom.init(room:))
+                let existingById = Dictionary(uniqueKeysWithValues: self.rooms.map { ($0.id, $0) })
+                self.rooms = values.map { room in
+                    SidebarRoom(room: room, initialRoomInfo: existingById[room.id()]?.roomInfo)
+                }
             }
         }
     }

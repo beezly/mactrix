@@ -14,16 +14,21 @@ public final class SidebarRoom: Identifiable {
         room.id()
     }
 
-    public init(room: MatrixRustSDK.Room) {
+    public init(room: MatrixRustSDK.Room, initialRoomInfo: RoomInfo? = nil) {
         self.room = room
+        self.roomInfo = initialRoomInfo
 
-        Task {
-            do {
-                roomInfo = try await room.roomInfo()
-            } catch {
-                Logger.SidebarRoom.error("Failed to fetch initial room info: \(error)")
+        if initialRoomInfo == nil {
+            Task {
+                do {
+                    roomInfo = try await room.roomInfo()
+                } catch {
+                    Logger.SidebarRoom.error("Failed to fetch initial room info: \(error)")
+                }
+
+                listenToRoomInfo()
             }
-
+        } else {
             listenToRoomInfo()
         }
     }

@@ -3,29 +3,29 @@ import MatrixRustSDK
 import OSLog
 
 extension MatrixClient {
-    func updateRoomEntries(roomEntriesUpdate: [RoomListEntriesUpdate]) {
+    func updateRoomEntries(roomEntriesUpdate: [RoomListEntriesUpdate]) async {
         for update in roomEntriesUpdate {
             switch update {
             case let .append(values):
-                self.rooms.append(contentsOf: values.map(SidebarRoom.init(room:)))
+                self.rooms.append(contentsOf: await makeRooms(values))
             case .clear:
                 self.rooms.removeAll()
             case let .pushFront(room):
-                self.rooms.insert(SidebarRoom(room: room), at: 0)
+                self.rooms.insert(await SidebarRoom.make(room: room), at: 0)
             case let .pushBack(room):
-                self.rooms.append(SidebarRoom(room: room))
+                self.rooms.append(await SidebarRoom.make(room: room))
             case .popFront:
                 self.rooms.removeFirst()
             case .popBack:
                 self.rooms.removeLast()
             case let .insert(index, room):
-                self.rooms.insert(SidebarRoom(room: room), at: Int(index))
+                self.rooms.insert(await SidebarRoom.make(room: room), at: Int(index))
             case let .set(index, room):
                 let existing = self.rooms[Int(index)]
                 if existing.id == room.id() {
                     existing.updateRoom(room)
                 } else {
-                    self.rooms[Int(index)] = SidebarRoom(room: room)
+                    self.rooms[Int(index)] = await SidebarRoom.make(room: room)
                 }
             case let .remove(index):
                 self.rooms.remove(at: Int(index))
@@ -33,14 +33,29 @@ extension MatrixClient {
                 self.rooms.removeSubrange(Int(length) ..< self.rooms.count)
             case let .reset(values: values):
                 let existingById = Dictionary(uniqueKeysWithValues: self.rooms.map { ($0.id, $0) })
-                self.rooms = values.map { room in
+                var newRooms: [SidebarRoom] = []
+                for room in values {
                     if let existing = existingById[room.id()] {
                         existing.updateRoom(room)
-                        return existing
+                        newRooms.append(existing)
+                    } else {
+                        newRooms.append(await SidebarRoom.make(room: room))
                     }
-                    return SidebarRoom(room: room)
                 }
+                self.rooms = newRooms
             }
+        }
+    }
+
+    /// Creates SidebarRoom instances in parallel while preserving order.
+    private func makeRooms(_ rooms: [MatrixRustSDK.Room]) async -> [SidebarRoom] {
+        await withTaskGroup(of: (Int, SidebarRoom).self) { group in
+            for (index, room) in rooms.enumerated() {
+                group.addTask { (index, await SidebarRoom.make(room: room)) }
+            }
+            var result: [(Int, SidebarRoom)] = []
+            for await item in group { result.append(item) }
+            return result.sorted { $0.0 < $1.0 }.map { $0.1 }
         }
     }
 }

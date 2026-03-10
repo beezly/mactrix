@@ -160,7 +160,7 @@ class MatrixClient {
 
             for await roomEntries in throttledListener {
                 guard let self else { break }
-                self.updateRoomEntries(roomEntriesUpdate: roomEntries)
+                await self.updateRoomEntries(roomEntriesUpdate: roomEntries)
             }
         }
 

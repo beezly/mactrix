@@ -39,7 +39,7 @@ public final class LiveRoom: Identifiable {
     }
 
     public convenience init(matrixRoom: MatrixRustSDK.Room) {
-        self.init(sidebarRoom: SidebarRoom(room: matrixRoom))
+        self.init(sidebarRoom: SidebarRoom.create(room: matrixRoom))
     }
 
     isolated deinit {

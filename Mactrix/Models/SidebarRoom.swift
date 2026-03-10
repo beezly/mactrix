@@ -5,16 +5,14 @@ import OSLog
 
 @MainActor @Observable
 public final class SidebarRoom: Identifiable {
-    public let room: MatrixRustSDK.Room
+    public let id: String
+    public nonisolated(unsafe) private(set) var room: MatrixRustSDK.Room
     public var roomInfo: RoomInfo?
 
     @ObservationIgnored private var roomInfoHandle: TaskHandle?
 
-    public nonisolated var id: String {
-        room.id()
-    }
-
     public init(room: MatrixRustSDK.Room) {
+        self.id = room.id()
         self.room = room
 
         Task {
@@ -26,6 +24,16 @@ public final class SidebarRoom: Identifiable {
 
             listenToRoomInfo()
         }
+    }
+
+    /// Updates the underlying room reference without replacing this instance.
+    /// Preserves loaded state (roomInfo, subscription) while ensuring the
+    /// room object is current.
+    public func updateRoom(_ newRoom: MatrixRustSDK.Room) {
+        assert(id == newRoom.id())
+        room = newRoom
+        roomInfoHandle = nil  // cancel old subscription
+        listenToRoomInfo()    // re-subscribe on new room reference
     }
 
     private func listenToRoomInfo() {

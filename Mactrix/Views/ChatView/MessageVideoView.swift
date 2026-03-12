@@ -69,7 +69,7 @@ struct MessageVideoView: View {
             let path = try handle.path()
             let url = URL(filePath: path, directoryHint: .notDirectory)
 
-            let asset = AVAsset(url: url)
+            let asset = AVURLAsset(url: url)
             let generator = AVAssetImageGenerator(asset: asset)
             generator.appliesPreferredTrackTransform = true
             generator.maximumSize = CGSize(width: 600, height: 600)

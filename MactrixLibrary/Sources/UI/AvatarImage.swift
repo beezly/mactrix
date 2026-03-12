@@ -5,6 +5,7 @@ import SwiftUI
 @MainActor
 public protocol ImageLoader {
     func loadImage(matrixUrl: String, size: CGSize?) async throws -> Image?
+    func cachedImage(matrixUrl: String) -> Image?
 }
 
 public struct AvatarImage<Preview: View>: View {
@@ -22,6 +23,9 @@ public struct AvatarImage<Preview: View>: View {
         self.avatarUrl = avatarUrl
         self.imageLoader = imageLoader
         self.placeholder = placeholder
+        if let avatarUrl, let cached = imageLoader?.cachedImage(matrixUrl: avatarUrl) {
+            self._avatar = State(initialValue: cached)
+        }
     }
 
     public init<Profile: UserProfile>(
@@ -47,11 +51,20 @@ public struct AvatarImage<Preview: View>: View {
     public var body: some View {
         imageOrPlaceholder
             .scaledToFill()
+            .transaction { $0.animation = nil }
             .task(id: avatarUrl, priority: .utility) {
                 guard let avatarUrl else {
                     avatar = nil
                     return
                 }
+
+                // Check cache first (handles cell reuse with stale @State)
+                if let cached = imageLoader?.cachedImage(matrixUrl: avatarUrl) {
+                    avatar = cached
+                    return
+                }
+
+                avatar = nil
 
                 do {
                     avatar = try await imageLoader?.loadImage(matrixUrl: avatarUrl, size: nil)

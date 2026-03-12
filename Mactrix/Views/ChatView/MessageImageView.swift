@@ -81,8 +81,16 @@ struct MessageImageView: View {
         .frame(maxHeight: maxHeight)
         .aspectRatio(aspectRatio, contentMode: .fit)
         .task(id: content.source.url(), priority: .utility) {
+            guard image == nil else { return }
             guard let matrixClient = appState.matrixClient else {
                 errorMessage = "Matrix client not available"
+                return
+            }
+
+            let cacheKey = NSString(string: content.source.url())
+            if let cached = MatrixClient.imageCache.object(forKey: cacheKey) {
+                imageData = cached.tiffRepresentation
+                image = Image(nsImage: cached)
                 return
             }
 
@@ -90,6 +98,9 @@ struct MessageImageView: View {
                 let data = try await matrixClient.client.getMediaContent(mediaSource: content.source)
                 imageData = data
                 image = try data.toOrientedImage(contentType: contentType)
+                if let nsImage = NSImage(data: data) {
+                    MatrixClient.imageCache.setObject(nsImage, forKey: cacheKey)
+                }
             } catch {
                 errorMessage = error.localizedDescription
             }

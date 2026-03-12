@@ -14,6 +14,14 @@ struct MessageImageView: View {
     @State private var image: Image? = nil
     @State private var errorMessage: String? = nil
 
+    init(content: ImageMessageContent) {
+        self.content = content
+        if let cached = MatrixClient.imageCache.object(forKey: NSString(string: content.source.url())) {
+            self._image = State(initialValue: Image(nsImage: cached))
+            self._imageData = State(initialValue: cached.tiffRepresentation)
+        }
+    }
+
     var aspectRatio: CGFloat? {
         guard let info = content.info,
               let height = info.height,

@@ -82,3 +82,20 @@ public struct UserAvatarPlaceholder<Profile: UserProfile>: View {
         }
     }
 }
+
+#Preview {
+    AvatarImage(userProfile: MockUserProfile(), imageLoader: nil)
+        .frame(width: 200, height: 200)
+        .background(Circle().fill(.blue))
+        .clipShape(Circle())
+
+    AvatarImage(userProfile: MockUserProfile(), imageLoader: nil)
+        .frame(width: 100, height: 100)
+        .background(Circle().fill(.blue))
+        .clipShape(Circle())
+
+    AvatarImage(userProfile: MockUserProfile(), imageLoader: nil)
+        .frame(width: 25, height: 25)
+        .background(Circle().fill(.blue))
+        .clipShape(Circle())
+}

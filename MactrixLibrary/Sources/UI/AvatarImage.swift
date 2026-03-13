@@ -45,22 +45,20 @@ public struct AvatarImage<Preview: View>: View {
     }
 
     public var body: some View {
-        GeometryReader { proxy in
-            imageOrPlaceholder
-                .aspectRatio(1.0, contentMode: .fit)
-                .task(id: avatarUrl, priority: .utility) {
-                    guard let avatarUrl = avatarUrl else {
-                        avatar = nil
-                        return
-                    }
-
-                    do {
-                        avatar = try await imageLoader?.loadImage(matrixUrl: avatarUrl, size: proxy.size)
-                    } catch {
-                        Logger.viewCycle.error("failed to load avatar (\(avatarUrl): \(error)")
-                    }
+        imageOrPlaceholder
+            .scaledToFill()
+            .task(id: avatarUrl, priority: .utility) {
+                guard let avatarUrl else {
+                    avatar = nil
+                    return
                 }
-        }
+
+                do {
+                    avatar = try await imageLoader?.loadImage(matrixUrl: avatarUrl, size: nil)
+                } catch {
+                    Logger.viewCycle.error("failed to load avatar (\(avatarUrl): \(error)")
+                }
+            }
     }
 }
 

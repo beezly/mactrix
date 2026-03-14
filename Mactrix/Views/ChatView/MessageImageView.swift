@@ -89,7 +89,6 @@ struct MessageImageView: View {
         .frame(maxHeight: maxHeight)
         .aspectRatio(aspectRatio, contentMode: .fit)
         .task(id: content.source.url(), priority: .utility) {
-            guard image == nil else { return }
             guard let matrixClient = appState.matrixClient else {
                 errorMessage = "Matrix client not available"
                 return
@@ -97,9 +96,7 @@ struct MessageImageView: View {
 
             let cacheKey = NSString(string: content.source.url())
             if let cached = MatrixClient.imageCache.object(forKey: cacheKey) {
-                imageData = cached.tiffRepresentation
                 image = Image(nsImage: cached)
-                return
             }
 
             do {

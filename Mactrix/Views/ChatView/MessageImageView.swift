@@ -81,6 +81,8 @@ struct MessageImageView: View {
         .frame(maxHeight: maxHeight)
         .aspectRatio(aspectRatio, contentMode: .fit)
         .task(id: content.source.url(), priority: .utility) {
+            errorMessage = nil
+
             guard let matrixClient = appState.matrixClient else {
                 errorMessage = "Matrix client not available"
                 return

@@ -267,11 +267,9 @@ extension MatrixClient: UI.ImageLoader {
         }
 
         do {
-            let image = try imageData.toOrientedImage(contentType: imageData.computeMimeType())
-            if let nsImage = NSImage(data: imageData) {
-                Self.imageCache.setObject(nsImage, forKey: cacheKey, cost: imageData.count)
-            }
-            return image
+            let nsImage = try imageData.toOrientedImage(contentType: imageData.computeMimeType())
+            Self.imageCache.setObject(nsImage, forKey: cacheKey, cost: imageData.count)
+            return Image(nsImage: nsImage)
         } catch {
             Logger.matrixClient.error("failed convert matrix media data to Image: \(error) \(imageData)")
             throw error

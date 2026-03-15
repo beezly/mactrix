@@ -242,18 +242,38 @@ extension MatrixClient: MatrixRustSDK.ClientSessionDelegate {
 }
 
 extension MatrixClient: UI.ImageLoader {
+    static let imageCache = NSCache<NSString, NSImage>()
+
+    func cachedImage(matrixUrl: String) -> Image? {
+        guard let nsImage = Self.imageCache.object(forKey: NSString(string: matrixUrl)) else { return nil }
+        return Image(nsImage: nsImage)
+    }
+
     func loadImage(matrixUrl: String, size: CGSize?) async throws -> Image? {
+        let cacheKey: NSString = if let size {
+            NSString(string: "\(matrixUrl)_\(Int(size.width))x\(Int(size.height))")
+        } else {
+            NSString(string: matrixUrl)
+        }
+        if let cached = Self.imageCache.object(forKey: cacheKey) {
+            return Image(nsImage: cached)
+        }
+
+        let mediaSource = try MediaSource.fromUrl(url: matrixUrl)
+
         let imageData: Data
         if let size {
             let width = UInt64(size.width)
             let height = UInt64(size.height)
-            imageData = try await client.getMediaThumbnail(mediaSource: .fromUrl(url: matrixUrl), width: UInt64(width), height: UInt64(height))
+            imageData = try await client.getMediaThumbnail(mediaSource: mediaSource, width: width, height: height)
         } else {
-            imageData = try await client.getMediaContent(mediaSource: .fromUrl(url: matrixUrl))
+            imageData = try await client.getMediaContent(mediaSource: mediaSource)
         }
 
         do {
-            return try imageData.toOrientedImage(contentType: imageData.computeMimeType())
+            let nsImage = try imageData.toOrientedImage(contentType: imageData.computeMimeType())
+            Self.imageCache.setObject(nsImage, forKey: cacheKey, cost: imageData.count)
+            return Image(nsImage: nsImage)
         } catch {
             Logger.matrixClient.error("failed convert matrix media data to Image: \(error) \(imageData)")
             throw error

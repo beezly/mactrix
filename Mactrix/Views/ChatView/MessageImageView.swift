@@ -14,6 +14,13 @@ struct MessageImageView: View {
     @State private var image: Image? = nil
     @State private var errorMessage: String? = nil
 
+    init(content: ImageMessageContent) {
+        self.content = content
+        if let cached = MatrixClient.imageCache.object(forKey: NSString(string: content.source.url())) {
+            self._image = State(initialValue: Image(nsImage: cached))
+        }
+    }
+
     var aspectRatio: CGFloat? {
         guard let info = content.info,
               let height = info.height,
@@ -86,10 +93,17 @@ struct MessageImageView: View {
                 return
             }
 
+            let cacheKey = NSString(string: content.source.url())
+            if let cached = MatrixClient.imageCache.object(forKey: cacheKey) {
+                image = Image(nsImage: cached)
+            }
+
             do {
                 let data = try await matrixClient.client.getMediaContent(mediaSource: content.source)
                 imageData = data
-                image = try data.toOrientedImage(contentType: contentType)
+                let nsImage = try data.toOrientedImage(contentType: contentType)
+                MatrixClient.imageCache.setObject(nsImage, forKey: cacheKey, cost: data.count)
+                image = Image(nsImage: nsImage)
             } catch {
                 errorMessage = error.localizedDescription
             }

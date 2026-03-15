@@ -28,12 +28,12 @@ extension Data {
         }
     }
 
-    /// Decode image data into a SwiftUI Image, applying EXIF orientation.
+    /// Decode image data into an NSImage, applying EXIF orientation.
     /// `Image(importing:contentType:)` on macOS does not apply EXIF orientation,
     /// so we route through CIImage which handles it correctly.
     struct ImageDecodeError: Error {}
 
-    func toOrientedImage(contentType: UTType? = nil) throws -> Image {
+    func toOrientedImage(contentType: UTType? = nil) throws -> NSImage {
         guard
             let source = CGImageSourceCreateWithData(self as CFData, nil),
             let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil)
@@ -50,6 +50,6 @@ extension Data {
         let rep = NSCIImageRep(ciImage: ciImage)
         let nsImage = NSImage(size: rep.size)
         nsImage.addRepresentation(rep)
-        return Image(nsImage: nsImage)
+        return nsImage
     }
 }

@@ -78,8 +78,8 @@ struct MessageImageView: View {
             }
         }
         .quickLookPreview($quickLookUrl)
-        .frame(maxHeight: maxHeight)
         .aspectRatio(aspectRatio, contentMode: .fit)
+        .frame(maxHeight: maxHeight)
         .task(id: content.source.url(), priority: .utility) {
             errorMessage = nil
 

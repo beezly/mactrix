@@ -65,138 +65,28 @@ struct ChatInputView: View {
         let caption = chatInput.isEmpty ? nil : chatInput
         let replyToId = replyTo?.eventOrTransactionId.id
 
-        if pendingAttachments.count == 1 {
-            await sendSingleAttachment(pendingAttachments[0], caption: caption, replyToId: replyToId, timeline: innerTimeline)
-        } else {
-            await sendGallery(caption: caption, replyToId: replyToId, timeline: innerTimeline)
+        for attachment in pendingAttachments {
+            await sendSingleAttachment(attachment, caption: caption, replyToId: replyToId, timeline: innerTimeline)
         }
     }
 
     private func sendSingleAttachment(_ attachment: PendingAttachment, caption: String?, replyToId: String?, timeline innerTimeline: Timeline) async {
         do {
+            let params = UploadParameters(source: attachment.uploadSource, caption: caption, formattedCaption: nil, mentions: nil, inReplyTo: replyToId)
             let handle: SendAttachmentJoinHandle
             if attachment.isImage {
-                let image = attachment.preview
-                // Compute blurhash on a small thumbnail to avoid blocking the UI
-                let blurhash: String? = await Task.detached {
-                    guard let image else { return nil as String? }
-                    let thumbSize = 32
-                    guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
-                          let ctx = CGContext(data: nil, width: thumbSize, height: thumbSize,
-                                             bitsPerComponent: 8, bytesPerRow: thumbSize * 4,
-                                             space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
-                    ctx.interpolationQuality = .low
-                    ctx.draw(cgImage, in: CGRect(x: 0, y: 0, width: thumbSize, height: thumbSize))
-                    guard let smallCG = ctx.makeImage() else { return nil }
-                    return NSImage(cgImage: smallCG, size: NSSize(width: thumbSize, height: thumbSize))
-                        .blurHash(numberOfComponents: (3, 3))
-                }.value
-                handle = try innerTimeline.sendImage(
-                    params: .init(
-                        source: attachment.uploadSource,
-                        caption: caption,
-                        formattedCaption: nil,
-                        mentions: nil,
-                        inReplyTo: replyToId
-                    ),
-                    thumbnailSource: nil,
-                    imageInfo: ImageInfo(
-                        height: image.map { UInt64($0.size.height) },
-                        width: image.map { UInt64($0.size.width) },
-                        mimetype: attachment.mimeType,
-                        size: UInt64(attachment.data.count),
-                        thumbnailInfo: nil, thumbnailSource: nil,
-                        blurhash: blurhash, isAnimated: false
-                    )
-                )
+                handle = try innerTimeline.sendImage(params: params, thumbnailSource: nil, imageInfo: await attachment.imageInfo())
             } else if attachment.isVideo {
-                let meta = await attachment.avMetadata()
-                let blurhash = await attachment.videoBlurhash()
-                handle = try innerTimeline.sendVideo(
-                    params: .init(source: attachment.uploadSource, caption: caption, formattedCaption: nil, mentions: nil, inReplyTo: replyToId),
-                    thumbnailSource: nil,
-                    videoInfo: VideoInfo(duration: meta.duration, height: meta.height, width: meta.width, mimetype: attachment.mimeType, size: UInt64(attachment.data.count), thumbnailInfo: nil, thumbnailSource: nil, blurhash: blurhash)
-                )
+                handle = try innerTimeline.sendVideo(params: params, thumbnailSource: nil, videoInfo: await attachment.videoInfo())
             } else if attachment.isAudio {
-                let meta = await attachment.avMetadata()
-                handle = try innerTimeline.sendAudio(
-                    params: .init(source: attachment.uploadSource, caption: caption, formattedCaption: nil, mentions: nil, inReplyTo: replyToId),
-                    audioInfo: AudioInfo(duration: meta.duration, size: UInt64(attachment.data.count), mimetype: attachment.mimeType)
-                )
+                handle = try innerTimeline.sendAudio(params: params, audioInfo: await attachment.audioInfo())
             } else {
-                handle = try innerTimeline.sendFile(
-                    params: .init(source: attachment.uploadSource, caption: caption, formattedCaption: nil, mentions: nil, inReplyTo: replyToId),
-                    fileInfo: FileInfo(mimetype: attachment.mimeType, size: UInt64(attachment.data.count), thumbnailInfo: nil, thumbnailSource: nil)
-                )
+                handle = try innerTimeline.sendFile(params: params, fileInfo: attachment.fileInfo())
             }
             try await handle.join()
         } catch {
+            attachmentError = "Failed to send: \(error.localizedDescription)"
             Logger.viewCycle.error("failed to send attachment: \(error)")
-            Logger.viewCycle.error("failed to send attachment: \(String(describing: error))")
-        }
-    }
-
-    private func sendGallery(caption: String?, replyToId: String?, timeline innerTimeline: Timeline) async {
-        var itemInfos: [GalleryItemInfo] = []
-        for attachment in pendingAttachments {
-            if attachment.isImage {
-                let image = attachment.preview
-                let blurhash: String? = await Task.detached {
-                    guard let image else { return nil as String? }
-                    let thumbSize = 32
-                    guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
-                          let ctx = CGContext(data: nil, width: thumbSize, height: thumbSize,
-                                             bitsPerComponent: 8, bytesPerRow: thumbSize * 4,
-                                             space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
-                    ctx.interpolationQuality = .low
-                    ctx.draw(cgImage, in: CGRect(x: 0, y: 0, width: thumbSize, height: thumbSize))
-                    guard let smallCG = ctx.makeImage() else { return nil }
-                    return NSImage(cgImage: smallCG, size: NSSize(width: thumbSize, height: thumbSize))
-                        .blurHash(numberOfComponents: (3, 3))
-                }.value
-                itemInfos.append(.image(
-                    imageInfo: ImageInfo(
-                        height: image.map { UInt64($0.size.height) }, width: image.map { UInt64($0.size.width) },
-                        mimetype: attachment.mimeType, size: UInt64(attachment.data.count),
-                        thumbnailInfo: nil, thumbnailSource: nil,
-                        blurhash: blurhash, isAnimated: false
-                    ),
-                    source: attachment.uploadSource, caption: nil, formattedCaption: nil, thumbnailSource: nil
-                ))
-            } else if attachment.isVideo {
-                let meta = await attachment.avMetadata()
-                let blurhash = await attachment.videoBlurhash()
-                itemInfos.append(.video(
-                    videoInfo: VideoInfo(
-                        duration: meta.duration, height: meta.height, width: meta.width,
-                        mimetype: attachment.mimeType, size: UInt64(attachment.data.count),
-                        thumbnailInfo: nil, thumbnailSource: nil, blurhash: blurhash
-                    ),
-                    source: attachment.uploadSource, caption: nil, formattedCaption: nil, thumbnailSource: nil
-                ))
-            } else if attachment.isAudio {
-                let meta = await attachment.avMetadata()
-                itemInfos.append(.audio(
-                    audioInfo: AudioInfo(duration: meta.duration, size: UInt64(attachment.data.count), mimetype: attachment.mimeType),
-                    source: attachment.uploadSource, caption: nil, formattedCaption: nil
-                ))
-            } else {
-                itemInfos.append(.file(
-                    fileInfo: FileInfo(mimetype: attachment.mimeType, size: UInt64(attachment.data.count), thumbnailInfo: nil, thumbnailSource: nil),
-                    source: attachment.uploadSource, caption: nil, formattedCaption: nil
-                ))
-            }
-        }
-
-        let params = GalleryUploadParameters(caption: caption, formattedCaption: nil, mentions: nil, inReplyTo: replyToId)
-        do {
-            let handle = try innerTimeline.sendGallery(params: params, itemInfos: itemInfos)
-            try await handle.join()
-        } catch {
-            attachmentError = "Failed to send gallery: \(error.localizedDescription)"
-            Logger.viewCycle.error("failed to send gallery: \(error)")
         }
     }
 
@@ -205,7 +95,7 @@ struct ChatInputView: View {
     private func addAttachments(_ attachments: [PendingAttachment]) async {
         let limit = await maxUploadSize
         for attachment in attachments {
-            if attachment.data.count > limit {
+            if UInt64(attachment.size) > limit {
                 attachmentError = "\(attachment.filename) exceeds the \(ByteCountFormatter.string(fromByteCount: Int64(limit), countStyle: .file)) upload limit"
                 continue
             }
@@ -226,7 +116,7 @@ struct ChatInputView: View {
 
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
         for provider in providers {
-            provider.loadFileRepresentation(forTypeIdentifier: "public.item") { url, _ in
+            provider.loadFileRepresentation(for: .item) { url, _, _ in
                 guard let url else { return }
                 if let attachment = PendingAttachment.fromFileURL(url) {
                     Task { @MainActor in await addAttachments([attachment]) }

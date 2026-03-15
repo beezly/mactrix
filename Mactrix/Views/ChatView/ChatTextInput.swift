@@ -76,29 +76,32 @@ class PastableTextView: NSTextView {
     override var acceptsFirstResponder: Bool { true }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        // Intercept ⌘V before the responder chain rejects it
         if event.modifierFlags.contains(.command), event.charactersIgnoringModifiers == "v" {
-            paste(nil)
-            return true
+            let pb = NSPasteboard.general
+            let hasImage = pb.availableType(from: [.png, .init("public.jpeg"), .fileURL]) != nil
+            let hasText = pb.string(forType: .string) != nil
+            if hasImage && !hasText {
+                onImagePaste?()
+                return true
+            }
         }
         return super.performKeyEquivalent(with: event)
     }
 
     override var intrinsicContentSize: NSSize {
-        guard let layoutManager, let textContainer else {
+        guard let textLayoutManager, let textContainer = textLayoutManager.textContainer else {
             return super.intrinsicContentSize
         }
-        layoutManager.ensureLayout(for: textContainer)
-        let rect = layoutManager.usedRect(for: textContainer)
-        let height = min(rect.height + textContainerInset.height * 2, 120)
-        return NSSize(width: NSView.noIntrinsicMetric, height: max(height, font?.pointSize ?? 13 + 4))
+        textLayoutManager.ensureLayout(for: textLayoutManager.documentRange)
+        let bounds = textLayoutManager.usageBoundsForTextContainer
+        let height = min(bounds.height + textContainerInset.height * 2, 120)
+        return NSSize(width: NSView.noIntrinsicMetric, height: max(height, (font?.pointSize ?? 13) + 4))
     }
 
     override func paste(_ sender: Any?) {
         let pb = NSPasteboard.general
         let hasImage = pb.availableType(from: [.png, .init("public.jpeg"), .fileURL]) != nil
         let hasText = pb.string(forType: .string) != nil
-
         if hasImage && !hasText {
             onImagePaste?()
         } else {

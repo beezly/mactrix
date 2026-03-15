@@ -75,7 +75,7 @@ struct ChatMessageView: View, UI.MessageEventActions {
             case let .file(content: content):
                 MessageFileView(content: content)
             case let .gallery(content: content):
-                MessageGalleryView(content: content)
+                Text("Gallery: \(content.body)").textSelection(.enabled)
             case let .notice(content: content):
                 Text(content.body.formatAsMarkdown)
                     .textSelection(.enabled)

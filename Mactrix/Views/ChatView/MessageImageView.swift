@@ -93,7 +93,11 @@ struct MessageImageView: View {
                 imageData = data
                 image = try data.toOrientedImage(contentType: contentType)
             } catch {
-                errorMessage = error.localizedDescription
+                // Send-queue local echoes have ephemeral cache — don't show errors for them
+                let isSendQueue = content.source.url().contains("send-queue.localhost")
+                if !isSendQueue {
+                    errorMessage = error.localizedDescription
+                }
             }
         }
     }

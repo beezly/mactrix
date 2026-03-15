@@ -104,7 +104,7 @@ class TimelineViewController: NSViewController {
         tableView.allowsColumnSelection = false
         tableView.selectionHighlightStyle = .none
 
-        tableView.rowHeight = -1
+        tableView.rowHeight = 44 // Default estimate; heightOfRow delegate overrides per row
         tableView.usesAutomaticRowHeights = true
 
         oldWidth = tableView.frame.width

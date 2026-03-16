@@ -1,6 +1,5 @@
 import AsyncAlgorithms
 import Foundation
-import KeychainAccess
 import MatrixRustSDK
 import OSLog
 import Security
@@ -44,19 +43,14 @@ struct UserSession: Codable {
 
     func saveUserToKeychain() throws {
         let keychainData = try JSONEncoder().encode(self)
-        let keychain = Keychain(service: applicationID)
-        try keychain.set(keychainData, key: Self.keychainKey)
+        try AppKeychain().save(keychainData, forKey: Self.keychainKey)
     }
 
     static func loadUserFromKeychain() throws -> Self? {
         Logger.matrixClient.debug("Load user from keychain")
-        /* #if DEBUG
-             if true {
-                 return try JSONDecoder().decode(Self.self, from: DevSecrets.matrixSession.data(using: .utf8)!)
-             }
-         #endif */
-        let keychain = Keychain(service: applicationID)
-        guard let keychainData = try keychain.getData(keychainKey) else { return nil }
-        return try JSONDecoder().decode(Self.self, from: keychainData)
+        if let keychainData = try AppKeychain().load(forKey: Self.keychainKey) {
+            return try JSONDecoder().decode(Self.self, from: keychainData)
+        }
+        return nil
     }
 }

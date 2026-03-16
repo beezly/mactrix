@@ -1,6 +1,5 @@
 import AsyncAlgorithms
 import Foundation
-import KeychainAccess
 import MatrixRustSDK
 import OSLog
 import Security
@@ -110,8 +109,7 @@ class MatrixClient {
         try? await client.logout()
         try? FileManager.default.removeItem(at: .sessionData(for: storeID))
         try? FileManager.default.removeItem(at: .sessionCaches(for: storeID))
-        let keychain = Keychain(service: applicationID)
-        try keychain.removeAll()
+        try AppKeychain().removeAll()
         Logger.matrixClient.debug("matrix client sign out complete")
     }
 

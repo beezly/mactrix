@@ -268,3 +268,52 @@ The test target depends on:
 - [swift-snapshot-testing](https://github.com/pointfreeco/swift-snapshot-testing) (v1.17+) — snapshot assertion library
 - `UI` module — the views under test
 - `Models` module (transitive) — mock types used in test fixtures
+
+## Gaps and Potential Improvements
+
+### Responsive layout testing
+
+No tests currently render views at multiple widths. Text wrapping, truncation, and layout reflow are untested. A useful addition would be parameterised snapshot tests that render each view at several widths (e.g. 300, 500, 800pt) to catch clipping and overflow regressions.
+
+### Interaction testing
+
+The current tests are render-only — no user actions are simulated. Clicking a reaction, hovering over a timestamp, toggling a thread, or typing in the message input are all untested. This could be addressed with:
+
+- XCTest UI tests against the running app for end-to-end interaction flows
+- Unit tests against view model logic to verify state transitions without rendering
+
+### Scroll and timeline behaviour
+
+There are no tests for timeline scrolling, scroll anchoring when new messages arrive, or lazy loading of older messages. These are common sources of regressions (e.g. the timeline jumping when images load) and would benefit from integration-level tests.
+
+### Dark mode and appearance variants
+
+All snapshots are recorded in the default (light) appearance. There are no tests for dark mode, high contrast, or reduced transparency. Snapshot tests could be extended to render each view in multiple `colorScheme` environments.
+
+### Accessibility
+
+No tests verify Dynamic Type scaling, VoiceOver labels, or keyboard navigation. SwiftUI's `accessibilityLabel` and `accessibilityElement` modifiers are untested. The `AccessibilitySnapshot` library or manual accessibility audits could fill this gap.
+
+### Edge case content
+
+The mock data uses short, well-behaved strings. Untested scenarios include:
+
+- Very long messages (thousands of characters, no whitespace)
+- Right-to-left text (Arabic, Hebrew)
+- Messages with many reactions (10+)
+- Deeply nested thread replies
+- Large numbers of read receipts
+- Empty or missing display names / avatars
+- Mixed inline content (links, code blocks, emoji-only messages)
+
+### Animation and transition coverage
+
+Snapshot tests capture a single frame and cannot verify animations, transitions, or timing. The hover-to-reveal timestamp in `GenericEventView`, reaction add/remove animations, and sheet presentation transitions are all untested.
+
+### Test determinism
+
+Mock data must avoid time-dependent values. `MockEventTimelineItem` previously used `.now` for its `date` property, causing snapshot tests to produce different timestamps on each run. All mocks should use fixed values — see `StableMockEvent` and the corrected `MockEventTimelineItem` for the pattern.
+
+### Performance and stress testing
+
+No tests measure rendering performance with large data sets (hundreds of timeline items, rooms with thousands of members). SwiftUI layout performance issues often only surface at scale and could be caught with targeted benchmarks using `XCTMetric`.

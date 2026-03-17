@@ -167,7 +167,6 @@ class TimelineViewController: NSViewController {
                 context.duration = 0
                 context.allowsImplicitAnimation = false
 
-                // Update only the height of visible rows
                 let visibleRect = tableView.visibleRect
                 let visibleRows = tableView.rows(in: visibleRect)
                 tableView.noteHeightOfRows(withIndexesChanged: IndexSet(integersIn: visibleRows.lowerBound ..< visibleRows.upperBound))
@@ -228,7 +227,18 @@ class TimelineViewController: NSViewController {
 
     func updateTimelineItems(_ timelineItems: [TimelineItem]) {
         Logger.timelineTableView.info("update timeline items")
+
+        let oldIds = self.timelineItems.map { $0.uniqueId().id }
         self.timelineItems = timelineItems.reversed()
+        let newIds = self.timelineItems.map { $0.uniqueId().id }
+
+        // If the IDs haven't changed, reload all rows in place (content-only update: reactions, read receipts, etc.)
+        // Reloads all rows rather than just visible ones to avoid stale content in NSTableView's prepared/cached views.
+        if oldIds == newIds {
+            tableView.reloadData(forRowIndexes: IndexSet(integersIn: 0..<self.timelineItems.count),
+                                 columnIndexes: IndexSet(integer: 0))
+            return
+        }
 
         var snapshot = NSDiffableDataSourceSnapshot<TimelineSection, TimelineUniqueId>()
         snapshot.appendSections([.main])
@@ -238,9 +248,16 @@ class TimelineViewController: NSViewController {
         }
 
         dataSource?.apply(snapshot, animatingDifferences: false)
+
+        // Re-measure visible rows after hosting views settle
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            let visibleRows = tableView.rows(in: tableView.visibleRect)
+            tableView.noteHeightOfRows(withIndexesChanged: IndexSet(integersIn: visibleRows.lowerBound..<visibleRows.upperBound))
+        }
     }
 
-    // values used to calculate height of a row
+    // values used to track width changes
     var oldWidth: CGFloat?
     let measurementHostingView = {
         let hostView = NSHostingController(rootView: AnyView(EmptyView()))
@@ -261,13 +278,14 @@ extension TimelineViewController: NSTableViewDelegate {
     func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
         let item = timelineItems[row]
 
-        measurementHostingView.rootView = AnyView(TimelineItemRowView(rowInfo: item.rowInfo, timeline: nil, coordinator: coordinator))
+        measurementHostingView.rootView = AnyView(TimelineItemRowView(rowInfo: item.rowInfo, timeline: timeline, coordinator: coordinator))
 
         let targetWidth = tableView.tableColumns[0].width
         let proposedSize = CGSize(width: targetWidth, height: CGFloat.greatestFiniteMagnitude)
 
         let size = measurementHostingView.sizeThatFits(in: proposedSize)
-        return size.height
+        // Avoid undefined-height rows which can cause NSTableView layout issues
+        return max(size.height, 1)
     }
 }
 

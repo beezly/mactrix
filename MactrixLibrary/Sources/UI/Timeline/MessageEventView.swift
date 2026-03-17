@@ -242,8 +242,6 @@ public struct MessageEventBodyView<
                     }
                 }
                 .padding(.top, hasBottomContent ? 10 : 0)
-                .frame(height: hasBottomContent ? nil : 0)
-                .clipped()
             }
 
             hoverActions

@@ -63,7 +63,7 @@ public struct MockEventTimelineItem: EventTimelineItem {
     }
 
     public var date: Date {
-        .now
+        Date(timeIntervalSinceReferenceDate: 0)
     }
 
     public var localCreatedAt: UInt64? {

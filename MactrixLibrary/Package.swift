@@ -21,6 +21,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/ZhgChgLi/ZMarkupParser.git", from: "1.12.0"),
+        .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", from: "1.17.0"),
         // .package(url: "https://github.com/matrix-org/matrix-rust-components-swift", from: "25.10.27"),
     ],
     targets: [
@@ -32,6 +33,13 @@ let package = Package(
         ),
         .target(name: "Utils"),
         .testTarget(name: "UtilsTests", dependencies: ["Utils"]),
+        .testTarget(
+            name: "UITests",
+            dependencies: [
+                "UI",
+                .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
+            ]
+        ),
         /* .target(
                 name: "TimelineUI",
                 dependencies: ["Models", .product(name: "MatrixRustSDK", package: "matrix-rust-components-swift")]

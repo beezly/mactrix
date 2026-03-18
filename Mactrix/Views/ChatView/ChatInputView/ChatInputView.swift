@@ -10,7 +10,6 @@ struct ChatInputView: View {
 
     @State private var isDraftLoaded: Bool = false
     @State private var chatInput: String = ""
-    @FocusState private var chatFocused: Bool
 
     func sendMessage() async {
         guard !chatInput.isEmpty else { return }
@@ -35,7 +34,7 @@ struct ChatInputView: View {
 
     private func saveDraft() async {
         guard isDraftLoaded else { return } // avoid saving a draft hasn't yet been restored
-        if chatInput.isEmpty && replyTo == nil {
+        if chatInput.isEmpty, replyTo == nil {
             Logger.viewCycle.debug("clearing draft")
             do {
                 try await room.clearComposerDraft(threadRoot: timeline.focusedThreadId)
@@ -65,14 +64,14 @@ struct ChatInputView: View {
     }
 
     private func loadDraft() async {
-        guard !isDraftLoaded else { return }  // don't load a draft more than once
+        guard !isDraftLoaded else { return } // don't load a draft more than once
         do {
             guard let draft = try await room.loadComposerDraft(threadRoot: timeline.focusedThreadId) else {
                 // no draft to load
                 isDraftLoaded = true
                 return
             }
-            self.chatInput = draft.plainText
+            chatInput = draft.plainText
             switch draft.draftType {
             case .reply(eventId: let eventId):
                 // we need a timeline to be able to populate the reply; return false so we can try again
@@ -83,7 +82,7 @@ struct ChatInputView: View {
 
                 do {
                     let item = try await innerTimeline.getEventTimelineItemByEventId(eventId: eventId)
-                    self.timeline.sendReplyTo = item
+                    timeline.sendReplyTo = item
                 } catch {
                     Logger.viewCycle.error("failed to resolve reply target: \(error)")
                 }
@@ -95,7 +94,7 @@ struct ChatInputView: View {
         } catch {
             Logger.viewCycle.error("failed to load draft: \(error)")
         }
-        isDraftLoaded = true  // so we don't try again
+        isDraftLoaded = true // so we don't try again
     }
 
     private func chatInputChanged() async {
@@ -123,29 +122,15 @@ struct ChatInputView: View {
                     replyTo = nil
                 }
             }
-            TextField("Message room", text: $chatInput, axis: .vertical)
-                .focused($chatFocused)
-                .onSubmit { Task { await sendMessage() } }
-                .textFieldStyle(.plain)
-                .lineLimit(nil)
-                .scrollContentBackground(.hidden)
-                .background(.clear)
-                .padding(10)
-                .disabled(!isDraftLoaded)  // avoid inputs until we've tried to load a draft
+            ChatTextView(text: $chatInput, disabled: !isDraftLoaded, onSubmit: { Task { await sendMessage() }})
         }
         .font(.system(size: .init(fontSize)))
         .background(Color(NSColor.textBackgroundColor))
         .cornerRadius(4)
-        .lineSpacing(2)
-        .frame(minHeight: 20)
         .overlay(
             RoundedRectangle(cornerRadius: 4)
                 .stroke(Color(NSColor.separatorColor), lineWidth: 1)
         )
-        // .shadow(color: .black.opacity(0.1), radius: 4)
-        .onTapGesture {
-            chatFocused = true
-        }
         .task(id: chatInput) {
             await chatInputChanged()
         }

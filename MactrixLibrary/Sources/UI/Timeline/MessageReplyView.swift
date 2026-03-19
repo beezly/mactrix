@@ -1,24 +1,29 @@
 import SwiftUI
 
-public struct MessageReplyView: View {
+public struct MessageReplyView<Content: View>: View {
     let username: String
-    let message: String
     let action: () -> Void
+    let content: Content
 
-    public init(username: String, message: String, action: @escaping () -> Void = {}) {
+    public init(username: String, message: String, action: @escaping () -> Void = {}) where Content == AnyView {
         self.username = username
-        self.message = message
         self.action = action
+        self.content = AnyView(Text(message.formatAsMarkdown).textSelection(.enabled))
     }
 
-    var content: some View {
+    public init(username: String, action: @escaping () -> Void = {}, @ViewBuilder content: () -> Content) {
+        self.username = username
+        self.action = action
+        self.content = content()
+    }
+
+    var label: some View {
         HStack {
             VStack(alignment: .leading) {
                 Text(username)
                     .bold()
                     .textSelection(.enabled)
-                Text(message.formatAsMarkdown)
-                    .textSelection(.enabled)
+                content
             }
         }
         .padding(.horizontal, 10)
@@ -41,7 +46,7 @@ public struct MessageReplyView: View {
         Button {
             action()
         } label: {
-            content
+            label
         }
         .buttonStyle(.plain)
     }

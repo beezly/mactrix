@@ -81,11 +81,9 @@ class TimelineMessageRowNSView: NSView {
     private var reactionsView: NSView?
     private var hoverActionsView: NSView?
     private var backgroundHighlight: NSView?
-    private var bodyTextField: NSTextField?  // tracked for preferredMaxLayoutWidth
     private var actions: TimelineMessageActions?
     private var event: MatrixRustSDK.EventTimelineItem?
     private var isFocused = false
-    private var mainStackWidth: NSLayoutConstraint?
 
     /// Shared per-controller state to suppress hover during scrolling.
     var scrollState: TimelineScrollState?
@@ -96,13 +94,11 @@ class TimelineMessageRowNSView: NSView {
         super.init(frame: frameRect)
         addSubview(mainStack)
         mainStack.translatesAutoresizingMaskIntoConstraints = false
-        let widthC = mainStack.widthAnchor.constraint(equalToConstant: 0)
-        mainStackWidth = widthC
         NSLayoutConstraint.activate([
             mainStack.topAnchor.constraint(equalTo: topAnchor),
             mainStack.leadingAnchor.constraint(equalTo: leadingAnchor),
+            mainStack.trailingAnchor.constraint(equalTo: trailingAnchor),
             mainStack.bottomAnchor.constraint(equalTo: bottomAnchor),
-            widthC,
         ])
     }
 
@@ -271,7 +267,7 @@ class TimelineMessageRowNSView: NSView {
         mainStack.arrangedSubviews.forEach { mainStack.removeArrangedSubview($0); $0.removeFromSuperview() }
         hoverActionsView?.removeFromSuperview(); hoverActionsView = nil
         reactionsView = nil
-        profileView = nil; bodyRowView = nil; backgroundHighlight = nil; bodyTextField = nil
+        profileView = nil; bodyRowView = nil; backgroundHighlight = nil
     }
 
     // MARK: Body row
@@ -435,7 +431,6 @@ class TimelineMessageRowNSView: NSView {
         field.lineBreakStrategy = .standard
         field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         field.setContentHuggingPriority(.defaultHigh, for: .vertical)
-        bodyTextField = field
         return field
     }
 
@@ -553,15 +548,6 @@ class TimelineMessageRowNSView: NSView {
     private func hideHoverActions() {
         hoverActionsView?.removeFromSuperview()
         hoverActionsView = nil
-    }
-
-    // MARK: Layout
-
-    override func layout() {
-        if mainStackWidth?.constant != bounds.width {
-            mainStackWidth?.constant = bounds.width
-        }
-        super.layout()
     }
 
     // MARK: Helpers

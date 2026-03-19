@@ -1,7 +1,7 @@
 import Models
 import SwiftUI
 
-struct ReadReciptsView<RoomMember: Models.RoomMember>: View {
+public struct ReadReciptsView<RoomMember: Models.RoomMember>: View {
     let receipts: [String: Receipt]
     let imageLoader: ImageLoader?
     let roomMembers: [RoomMember]
@@ -9,6 +9,12 @@ struct ReadReciptsView<RoomMember: Models.RoomMember>: View {
     private let truncatedAvatarLimit = 3
     private let fullAvatarLimit = 4
     @State private var showPopover: Bool = false
+
+    public init(receipts: [String: Receipt], imageLoader: ImageLoader?, roomMembers: [RoomMember]) {
+        self.receipts = receipts
+        self.imageLoader = imageLoader
+        self.roomMembers = roomMembers
+    }
 
     var users: [String] {
         receipts
@@ -115,7 +121,7 @@ struct ReadReciptsView<RoomMember: Models.RoomMember>: View {
         .padding()
     }
 
-    var body: some View {
+    public var body: some View {
         Button {
             showPopover.toggle()
         } label: {

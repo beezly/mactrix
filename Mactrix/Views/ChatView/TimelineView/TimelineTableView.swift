@@ -38,8 +38,8 @@ struct TimelineItemRowView: View {
     @ViewBuilder
     var contentView: some View {
         switch rowInfo {
-        case .message(let event, let content):
-            ChatMessageView(timeline: timeline, event: event, msg: content, includeProfileHeader: true)
+        case .message:
+            fatalError("Messages are handled by TimelineMessageRowNSView")
         case .state(let event):
             UI.GenericEventView(event: event, name: event.content.description)
         case .virtual(let virtual):
@@ -48,13 +48,9 @@ struct TimelineItemRowView: View {
     }
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 0) {
-            VStack(spacing: 0) {
-                contentView
-                    .environment(appState)
-                    .environment(windowState)
-            }
-        }
+        contentView
+            .environment(appState)
+            .environment(windowState)
     }
 }
 
@@ -87,6 +83,7 @@ class TimelineViewController: NSViewController {
 
     let timeline: LiveTimeline
     var timelineItems: [TimelineItem]
+    let scrollState = TimelineScrollState()
 
     init(coordinator: TimelineViewRepresentable.Coordinator, timeline: LiveTimeline, timelineItems: [TimelineItem]) {
         self.coordinator = coordinator
@@ -113,23 +110,46 @@ class TimelineViewController: NSViewController {
             guard let self else { return NSView() }
 
             let item = timelineItems[row]
-            let view = TimelineItemRowView(rowInfo: item.rowInfo, timeline: timeline, coordinator: coordinator)
 
-            let hostView: NSHostingView<TimelineItemRowView>
-            if let recycledView = tableView.makeView(withIdentifier: item.rowInfo.reuseIdentifier, owner: self)
-                as? NSHostingView<TimelineItemRowView>
-            {
-                recycledView.rootView = view
-                hostView = recycledView
-            } else {
-                hostView = NSHostingView<TimelineItemRowView>(rootView: view)
-                hostView.identifier = item.rowInfo.reuseIdentifier
-                hostView.autoresizingMask = [.width, .height]
-                hostView.sizingOptions = [.preferredContentSize]
-                hostView.setContentHuggingPriority(.required, for: .vertical)
+            switch item.rowInfo {
+            case .message(let event, let content):
+                let rowView: TimelineMessageRowNSView
+                if let recycled = tableView.makeView(withIdentifier: item.rowInfo.reuseIdentifier, owner: self)
+                    as? TimelineMessageRowNSView
+                {
+                    rowView = recycled
+                } else {
+                    rowView = TimelineMessageRowNSView()
+                    rowView.identifier = item.rowInfo.reuseIdentifier
+                    rowView.autoresizingMask = [.width, .height]
+                }
+                rowView.scrollState = scrollState
+                rowView.configure(
+                    event: event, content: content,
+                    includeProfileHeader: true,
+                    timeline: timeline,
+                    appState: coordinator.appState,
+                    windowState: coordinator.windowState
+                )
+                return rowView
+
+            case .state, .virtual:
+                let view = TimelineItemRowView(rowInfo: item.rowInfo, timeline: timeline, coordinator: coordinator)
+                let hostView: NSHostingView<TimelineItemRowView>
+                if let recycled = tableView.makeView(withIdentifier: item.rowInfo.reuseIdentifier, owner: self)
+                    as? NSHostingView<TimelineItemRowView>
+                {
+                    recycled.rootView = view
+                    hostView = recycled
+                } else {
+                    hostView = NSHostingView<TimelineItemRowView>(rootView: view)
+                    hostView.identifier = item.rowInfo.reuseIdentifier
+                    hostView.autoresizingMask = [.width, .height]
+                    hostView.sizingOptions = [.preferredContentSize]
+                    hostView.setContentHuggingPriority(.required, for: .vertical)
+                }
+                return hostView
             }
-
-            return hostView
         }
 
         tableView.delegate = self
@@ -175,8 +195,26 @@ class TimelineViewController: NSViewController {
     }
 
     var timelineFetchTask: Task<Void, Never>?
+    private var scrollHoverTimer: Timer?
 
     @objc func viewDidScroll(_ notification: Notification) {
+        // Suppress hover during scrolling
+        scrollState.suppressHover = true
+        scrollHoverTimer?.invalidate()
+        scrollHoverTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { [weak self] _ in
+            guard let self else { return }
+            scrollState.suppressHover = false
+            reactivateHoverUnderMouse()
+        }
+
+        // Dismiss hover on all visible message rows
+        let visibleRows = tableView.rows(in: tableView.visibleRect)
+        for row in visibleRows.lowerBound..<visibleRows.upperBound {
+            if let rowView = tableView.view(atColumn: 0, row: row, makeIfNecessary: false) as? TimelineMessageRowNSView {
+                rowView.dismissHover()
+            }
+        }
+
         let currentOffset = scrollView.contentView.bounds.origin.y
         let timelineHeight = scrollView.contentView.documentRect.height
         let viewHeight = scrollView.contentView.documentVisibleRect.height
@@ -196,6 +234,17 @@ class TimelineViewController: NSViewController {
                 timelineFetchTask = nil
             }
         }
+    }
+
+    private func reactivateHoverUnderMouse() {
+        guard let window = tableView.window else { return }
+        let windowPoint = window.mouseLocationOutsideOfEventStream
+        let tablePoint = tableView.convert(windowPoint, from: nil)
+        let row = tableView.row(at: tablePoint)
+        guard row >= 0,
+              let rowView = tableView.view(atColumn: 0, row: row, makeIfNecessary: false) as? TimelineMessageRowNSView
+        else { return }
+        rowView.activateHover()
     }
 
     func listenForFocusTimelineItem() {
@@ -278,14 +327,29 @@ extension TimelineViewController: NSTableViewDelegate {
     func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
         let item = timelineItems[row]
 
-        measurementHostingView.rootView = AnyView(TimelineItemRowView(rowInfo: item.rowInfo, timeline: timeline, coordinator: coordinator))
+        switch item.rowInfo {
+        case .message(_, let content):
+            // Better estimate based on content type to reduce scroll stutter
+            if case .message(let msg) = content.kind {
+                switch msg.msgType {
+                case .image(let img):
+                    let maxH: CGFloat = min(CGFloat(img.info?.height ?? 300), 300)
+                    return maxH + 60 // profile header + padding
+                case .video(let vid):
+                    let maxH: CGFloat = min(CGFloat(vid.info?.height ?? 300), 300)
+                    return maxH + 60
+                default:
+                    break
+                }
+            }
+            return 44
 
-        let targetWidth = tableView.tableColumns[0].width
-        let proposedSize = CGSize(width: targetWidth, height: CGFloat.greatestFiniteMagnitude)
-
-        let size = measurementHostingView.sizeThatFits(in: proposedSize)
-        // Avoid undefined-height rows which can cause NSTableView layout issues
-        return max(size.height, 1)
+        case .state, .virtual:
+            measurementHostingView.rootView = AnyView(TimelineItemRowView(rowInfo: item.rowInfo, timeline: timeline, coordinator: coordinator))
+            let targetWidth = tableView.tableColumns[0].width
+            let size = measurementHostingView.sizeThatFits(in: CGSize(width: targetWidth, height: .greatestFiniteMagnitude))
+            return max(size.height, 1)
+        }
     }
 }
 

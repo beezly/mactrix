@@ -1,17 +1,23 @@
 import Models
 import SwiftUI
 
-struct HoverButton<Icon: View>: View {
+public struct HoverButton<Icon: View>: View {
     @State private var hovering = false
 
     @ViewBuilder
-    let icon: () -> Icon
-    let tooltip: LocalizedStringKey
-    let action: () -> Void
+    public let icon: () -> Icon
+    public let tooltip: LocalizedStringKey
+    public let action: () -> Void
 
-    let size: CGFloat = 24.0
+    public let size: CGFloat = 24.0
 
-    var body: some View {
+    public init(icon: @escaping () -> Icon, tooltip: LocalizedStringKey, action: @escaping () -> Void) {
+        self.icon = icon
+        self.tooltip = tooltip
+        self.action = action
+    }
+
+    public var body: some View {
         Button(action: action) {
             icon()
         }

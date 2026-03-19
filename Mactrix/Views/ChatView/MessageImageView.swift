@@ -77,6 +77,7 @@ struct MessageImageView: View {
                     ProgressView {
                         Text("Fetching image")
                     }
+                    .frame(maxWidth: .infinity, minHeight: maxHeight)
                 }
                 if let caption = content.caption {
                     Text(caption.formatAsMarkdown)
@@ -85,7 +86,7 @@ struct MessageImageView: View {
             }
         }
         .quickLookPreview($quickLookUrl)
-        .frame(maxHeight: maxHeight)
+        .frame(maxWidth: .infinity, maxHeight: maxHeight, alignment: .leading)
         .aspectRatio(aspectRatio, contentMode: .fit)
         .task(id: content.source.url(), priority: .utility) {
             guard let matrixClient = appState.matrixClient else {

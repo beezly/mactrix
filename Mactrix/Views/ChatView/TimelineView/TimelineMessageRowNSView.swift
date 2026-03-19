@@ -125,16 +125,94 @@ class TimelineMessageRowNSView: NSView {
         case .message(let event, let content):
             configureMessage(event: event, content: content, timeline: timeline, appState: appState, windowState: windowState)
         case .state(let event):
-            addHostedView(
-                UI.GenericEventView(event: event, name: event.content.description)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            )
+            configureStateEvent(event: event)
         case .virtual(let virtual):
-            addHostedView(
-                UI.VirtualItemView(item: virtual.asModel)
-                    .frame(maxWidth: .infinity)
-            )
+            configureVirtualItem(virtual: virtual)
         }
+    }
+
+    private func configureStateEvent(event: MatrixRustSDK.EventTimelineItem) {
+        let container = NSView()
+        container.translatesAutoresizingMaskIntoConstraints = false
+
+        let timestamp = NSTextField(labelWithString: Self.formatTimestamp(event.date))
+        timestamp.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+        timestamp.textColor = .secondaryLabelColor
+        timestamp.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(timestamp)
+
+        let body = NSTextField(labelWithString: "")
+        let text = NSMutableAttributedString()
+        text.append(NSAttributedString(string: event.sender, attributes: [.font: NSFont.boldSystemFont(ofSize: 12)]))
+        text.append(NSAttributedString(string: ": "))
+        text.append(NSAttributedString(string: event.content.description, attributes: [
+            .font: NSFontManager.shared.convert(.systemFont(ofSize: 12), toHaveTrait: .italicFontMask),
+        ]))
+        body.attributedStringValue = text
+        body.textColor = .secondaryLabelColor
+        body.isEditable = false
+        body.isSelectable = true
+        body.lineBreakMode = .byWordWrapping
+        body.usesSingleLineMode = false
+        body.translatesAutoresizingMaskIntoConstraints = false
+        body.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        container.addSubview(body)
+
+        NSLayoutConstraint.activate([
+            timestamp.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: horizontalPadding),
+            timestamp.widthAnchor.constraint(equalToConstant: 54),
+            timestamp.topAnchor.constraint(equalTo: body.topAnchor, constant: 3),
+            body.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: horizontalPadding + avatarColumnWidth),
+            body.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -horizontalPadding),
+            body.topAnchor.constraint(equalTo: container.topAnchor, constant: bodyVerticalPadding),
+            body.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -bodyVerticalPadding),
+        ])
+
+        container.translatesAutoresizingMaskIntoConstraints = false
+        mainStack.addArrangedSubview(container)
+        container.widthAnchor.constraint(equalTo: mainStack.widthAnchor).isActive = true
+    }
+
+    private func configureVirtualItem(virtual: MatrixRustSDK.VirtualTimelineItem) {
+        let text: String
+        let isReadMarker: Bool
+        switch virtual {
+        case .dateDivider(ts: let ts):
+            text = Self.formatDividerDate(ts.date); isReadMarker = false
+        case .readMarker:
+            text = "Read Marker"; isReadMarker = true
+        case .timelineStart:
+            text = "Start of conversation"; isReadMarker = false
+        }
+
+        let container = NSView()
+        container.translatesAutoresizingMaskIntoConstraints = false
+
+        let separator = NSBox()
+        separator.boxType = .separator
+        separator.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(separator)
+
+        let label = NSTextField(labelWithString: text)
+        label.font = isReadMarker ? .systemFont(ofSize: 12, weight: .medium) : .systemFont(ofSize: 12)
+        label.textColor = isReadMarker ? .systemRed : .secondaryLabelColor
+        label.backgroundColor = .controlBackgroundColor
+        label.drawsBackground = true
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.setContentHuggingPriority(.required, for: .horizontal)
+        container.addSubview(label)
+
+        NSLayoutConstraint.activate([
+            separator.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: horizontalPadding),
+            separator.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -horizontalPadding),
+            separator.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            label.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            label.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            container.heightAnchor.constraint(equalToConstant: 40),
+        ])
+
+        mainStack.addArrangedSubview(container)
+        container.widthAnchor.constraint(equalTo: mainStack.widthAnchor).isActive = true
     }
 
     private func configureMessage(
@@ -497,6 +575,17 @@ class TimelineMessageRowNSView: NSView {
 
     static func formatTimestamp(_ date: Date) -> String {
         timestampFormatter.string(from: date)
+    }
+
+    private static func formatDividerDate(_ date: Date) -> String {
+        let dayInSecs: Double = 60 * 60 * 24
+        if Date.now.timeIntervalSince(date) < dayInSecs {
+            return String(localized: "Today")
+        } else if Date.now.timeIntervalSince(date) < dayInSecs * 2 {
+            return String(localized: "Yesterday")
+        } else {
+            return date.formatted(date: .long, time: .omitted)
+        }
     }
 }
 

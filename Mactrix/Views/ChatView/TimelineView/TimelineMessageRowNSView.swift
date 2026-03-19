@@ -106,9 +106,38 @@ class TimelineMessageRowNSView: NSView {
     // MARK: Configure
 
     func configure(
+        rowInfo: TimelineItemRowInfo,
+        timeline: LiveTimeline?,
+        appState: AppState,
+        windowState: WindowState
+    ) {
+        clearSubviews()
+
+        switch rowInfo {
+        case .message(let event, let content):
+            configureMessage(event: event, content: content, timeline: timeline, appState: appState, windowState: windowState)
+        case .state(let event):
+            let hostView = NSHostingView(rootView: AnyView(
+                UI.GenericEventView(event: event, name: event.content.description)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            ))
+            hostView.translatesAutoresizingMaskIntoConstraints = false
+            mainStack.addArrangedSubview(hostView)
+            hostView.widthAnchor.constraint(equalTo: mainStack.widthAnchor).isActive = true
+        case .virtual(let virtual):
+            let hostView = NSHostingView(rootView: AnyView(
+                UI.VirtualItemView(item: virtual.asModel)
+                    .frame(maxWidth: .infinity)
+            ))
+            hostView.translatesAutoresizingMaskIntoConstraints = false
+            mainStack.addArrangedSubview(hostView)
+            hostView.widthAnchor.constraint(equalTo: mainStack.widthAnchor).isActive = true
+        }
+    }
+
+    private func configureMessage(
         event: MatrixRustSDK.EventTimelineItem,
         content: MatrixRustSDK.MsgLikeContent,
-        includeProfileHeader: Bool,
         timeline: LiveTimeline?,
         appState: AppState,
         windowState: WindowState
@@ -123,19 +152,15 @@ class TimelineMessageRowNSView: NSView {
         let fontSize = CGFloat(raw == 0 ? 13 : max(9, min(raw, 72)))
         let ownUserId = (try? appState.matrixClient?.client.userId()) ?? ""
 
-        clearSubviews()
-
         // 1. Profile header
-        if includeProfileHeader {
-            let profile = UI.MessageEventProfileView(event: event, actions: actions, imageLoader: imageLoader)
-                .font(.system(size: fontSize))
-                .environment(appState).environment(windowState)
-            let hostView = NSHostingView(rootView: AnyView(profile))
-            hostView.translatesAutoresizingMaskIntoConstraints = false
-            mainStack.addArrangedSubview(hostView)
-            hostView.widthAnchor.constraint(equalTo: mainStack.widthAnchor).isActive = true
-            profileView = hostView
-        }
+        let profile = UI.MessageEventProfileView(event: event, actions: actions, imageLoader: imageLoader)
+            .font(.system(size: fontSize))
+            .environment(appState).environment(windowState)
+        let profileHost = NSHostingView(rootView: AnyView(profile))
+        profileHost.translatesAutoresizingMaskIntoConstraints = false
+        mainStack.addArrangedSubview(profileHost)
+        profileHost.widthAnchor.constraint(equalTo: mainStack.widthAnchor).isActive = true
+        profileView = profileHost
 
         // 2. Body row
         let bodyRow = makeBodyRow(event: event, content: content, actions: actions,

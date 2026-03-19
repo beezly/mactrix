@@ -105,6 +105,14 @@ class TimelineMessageRowNSView: NSView {
 
     // MARK: Configure
 
+    /// Adds a SwiftUI view to the mainStack as a full-width NSHostingView.
+    private func addHostedView<V: View>(_ view: V) {
+        let hostView = NSHostingView(rootView: AnyView(view))
+        hostView.translatesAutoresizingMaskIntoConstraints = false
+        mainStack.addArrangedSubview(hostView)
+        hostView.widthAnchor.constraint(equalTo: mainStack.widthAnchor).isActive = true
+    }
+
     func configure(
         rowInfo: TimelineItemRowInfo,
         timeline: LiveTimeline?,
@@ -117,21 +125,15 @@ class TimelineMessageRowNSView: NSView {
         case .message(let event, let content):
             configureMessage(event: event, content: content, timeline: timeline, appState: appState, windowState: windowState)
         case .state(let event):
-            let hostView = NSHostingView(rootView: AnyView(
+            addHostedView(
                 UI.GenericEventView(event: event, name: event.content.description)
                     .frame(maxWidth: .infinity, alignment: .leading)
-            ))
-            hostView.translatesAutoresizingMaskIntoConstraints = false
-            mainStack.addArrangedSubview(hostView)
-            hostView.widthAnchor.constraint(equalTo: mainStack.widthAnchor).isActive = true
+            )
         case .virtual(let virtual):
-            let hostView = NSHostingView(rootView: AnyView(
+            addHostedView(
                 UI.VirtualItemView(item: virtual.asModel)
                     .frame(maxWidth: .infinity)
-            ))
-            hostView.translatesAutoresizingMaskIntoConstraints = false
-            mainStack.addArrangedSubview(hostView)
-            hostView.widthAnchor.constraint(equalTo: mainStack.widthAnchor).isActive = true
+            )
         }
     }
 
@@ -156,11 +158,8 @@ class TimelineMessageRowNSView: NSView {
         let profile = UI.MessageEventProfileView(event: event, actions: actions, imageLoader: imageLoader)
             .font(.system(size: fontSize))
             .environment(appState).environment(windowState)
-        let profileHost = NSHostingView(rootView: AnyView(profile))
-        profileHost.translatesAutoresizingMaskIntoConstraints = false
-        mainStack.addArrangedSubview(profileHost)
-        profileHost.widthAnchor.constraint(equalTo: mainStack.widthAnchor).isActive = true
-        profileView = profileHost
+        addHostedView(profile)
+        profileView = mainStack.arrangedSubviews.last
 
         // 2. Body row
         let bodyRow = makeBodyRow(event: event, content: content, actions: actions,
@@ -176,7 +175,6 @@ class TimelineMessageRowNSView: NSView {
                 ownUserId: ownUserId, imageLoader: imageLoader, roomMembers: timeline?.room.members ?? []
             )
             mainStack.addArrangedSubview(reactionsRow)
-            // Pin width to self to ensure full table column width
             reactionsRow.translatesAutoresizingMaskIntoConstraints = false
             reactionsRow.widthAnchor.constraint(equalTo: mainStack.widthAnchor).isActive = true
             reactionsView = reactionsRow

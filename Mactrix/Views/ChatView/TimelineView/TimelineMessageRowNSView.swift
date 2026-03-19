@@ -54,6 +54,12 @@ class TimelineMessageRowNSView: NSView {
     private let horizontalPadding: CGFloat = 10
     private let bodyVerticalPadding: CGFloat = 4
 
+    // Height estimates for NSTableView's heightOfRow (Auto Layout corrects these)
+    static let estimatedTextHeight: CGFloat = 44
+    static let estimatedStateHeight: CGFloat = 30
+    static let virtualItemHeight: CGFloat = 40
+    static let mediaOverhead: CGFloat = 60 // profile header + padding around media
+
     // MARK: Persistent subviews
 
     private let mainStack: NSStackView = {
@@ -208,7 +214,7 @@ class TimelineMessageRowNSView: NSView {
             separator.centerYAnchor.constraint(equalTo: container.centerYAnchor),
             label.centerXAnchor.constraint(equalTo: container.centerXAnchor),
             label.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-            container.heightAnchor.constraint(equalToConstant: 40),
+            container.heightAnchor.constraint(equalToConstant: Self.virtualItemHeight),
         ])
 
         mainStack.addArrangedSubview(container)

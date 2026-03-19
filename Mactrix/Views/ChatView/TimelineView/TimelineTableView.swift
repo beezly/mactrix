@@ -273,19 +273,19 @@ extension TimelineViewController: NSTableViewDelegate {
                 switch msg.msgType {
                 case .image(let img):
                     let maxH: CGFloat = min(CGFloat(img.info?.height ?? 300), 300)
-                    return maxH + 60
+                    return maxH + TimelineMessageRowNSView.mediaOverhead
                 case .video(let vid):
                     let maxH: CGFloat = min(CGFloat(vid.info?.height ?? 300), 300)
-                    return maxH + 60
+                    return maxH + TimelineMessageRowNSView.mediaOverhead
                 default:
                     break
                 }
             }
-            return 44
+            return TimelineMessageRowNSView.estimatedTextHeight
         case .state:
-            return 30
+            return TimelineMessageRowNSView.estimatedStateHeight
         case .virtual:
-            return 40
+            return TimelineMessageRowNSView.virtualItemHeight
         }
     }
 }

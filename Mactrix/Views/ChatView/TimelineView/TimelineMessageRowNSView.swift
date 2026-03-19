@@ -311,11 +311,11 @@ class TimelineMessageRowNSView: NSView {
         contentStack.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(contentStack)
 
-        /// Adds a view to the content stack, pinning hosting views to full width.
+        /// Adds a view to the content stack, pinning hosting views and text fields to full width.
         func addToContentStack(_ view: NSView) {
             view.translatesAutoresizingMaskIntoConstraints = false
             contentStack.addArrangedSubview(view)
-            if view is NSHostingView<AnyView> {
+            if view is NSHostingView<AnyView> || view is NSTextField {
                 view.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
             }
         }
@@ -558,17 +558,10 @@ class TimelineMessageRowNSView: NSView {
     // MARK: Layout
 
     override func layout() {
-        // Drive mainStack width from table column, not from content
         if mainStackWidth?.constant != bounds.width {
             mainStackWidth?.constant = bounds.width
         }
         super.layout()
-        if let bodyTextField {
-            let available = bounds.width - avatarColumnWidth - (horizontalPadding * 2)
-            if bodyTextField.preferredMaxLayoutWidth != available {
-                bodyTextField.preferredMaxLayoutWidth = available
-            }
-        }
     }
 
     // MARK: Helpers

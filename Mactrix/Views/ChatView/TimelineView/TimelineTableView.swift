@@ -68,10 +68,8 @@ class TimelineViewController: NSViewController {
         tableView.allowsColumnSelection = false
         tableView.selectionHighlightStyle = .none
 
-        tableView.rowHeight = -1
+        tableView.rowHeight = TimelineMessageRowNSView.estimatedTextHeight
         tableView.usesAutomaticRowHeights = true
-
-        oldWidth = tableView.frame.width
 
         dataSource = .init(tableView: tableView) { [weak self] tableView, _, row, _ in
             guard let self else { return NSView() }
@@ -109,34 +107,12 @@ class TimelineViewController: NSViewController {
         scrollView.contentView.postsBoundsChangedNotifications = true
         NotificationCenter.default.addObserver(
             self,
-            selector: #selector(handleTableResize),
-            name: NSView.frameDidChangeNotification,
-            object: scrollView.contentView
-        )
-
-        NotificationCenter.default.addObserver(
-            self,
             selector: #selector(viewDidScroll(_:)),
             name: NSView.boundsDidChangeNotification,
             object: scrollView.contentView
         )
 
         listenForFocusTimelineItem()
-    }
-
-    @objc func handleTableResize(_ notification: Notification) {
-        if oldWidth != tableView.frame.width {
-            oldWidth = tableView.frame.width
-
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0
-                context.allowsImplicitAnimation = false
-
-                let visibleRect = tableView.visibleRect
-                let visibleRows = tableView.rows(in: visibleRect)
-                tableView.noteHeightOfRows(withIndexesChanged: IndexSet(integersIn: visibleRows.lowerBound ..< visibleRows.upperBound))
-            }
-        }
     }
 
     var timelineFetchTask: Task<Void, Never>?
@@ -251,8 +227,6 @@ class TimelineViewController: NSViewController {
         }
     }
 
-    // values used to track width changes
-    var oldWidth: CGFloat?
 }
 
 extension TimelineViewController: NSTableViewDelegate {
@@ -262,6 +236,10 @@ extension TimelineViewController: NSTableViewDelegate {
 
     func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
         return false
+    }
+
+    func tableView(_ tableView: NSTableView, didAdd rowView: NSTableRowView, forRow row: Int) {
+        rowView.translatesAutoresizingMaskIntoConstraints = false
     }
 
     func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {

@@ -1,0 +1,95 @@
+name: Notarize
+
+on:
+  repository_dispatch:
+    types: [notarize]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Upstream workflow run ID"
+        required: true
+      repo:
+        description: "Upstream repo (owner/name)"
+        required: true
+        default: "viktorstrate/mactrix"
+
+jobs:
+  notarize:
+    runs-on: macos-15
+    steps:
+      - name: Checkout (for exportOptions.plist)
+        uses: actions/checkout@v4
+
+      - name: Set inputs
+        id: inputs
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "run_id=${{ github.event.client_payload.run_id }}" >> $GITHUB_OUTPUT
+            echo "repo=${{ github.event.client_payload.repo }}" >> $GITHUB_OUTPUT
+          else
+            echo "run_id=${{ inputs.run_id }}" >> $GITHUB_OUTPUT
+            echo "repo=${{ inputs.repo }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download artifact from upstream
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.UPSTREAM_READ_TOKEN }}
+          script: |
+            const [owner, repo] = '${{ steps.inputs.outputs.repo }}'.split('/');
+            const runId = parseInt('${{ steps.inputs.outputs.run_id }}');
+            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+              owner, repo, run_id: runId
+            });
+            const artifact = artifacts.data.artifacts.find(a => a.name === 'Mactrix.app');
+            if (!artifact) throw new Error('Mactrix.app artifact not found');
+            const download = await github.rest.actions.downloadArtifact({
+              owner, repo,
+              artifact_id: artifact.id,
+              archive_format: 'zip'
+            });
+            require('fs').writeFileSync('Mactrix.zip', Buffer.from(download.data));
+
+      - name: Unzip artifact
+        run: |
+          mkdir -p MactrixApp
+          unzip Mactrix.zip -d MactrixApp
+
+      - name: Import signing certificate
+        run: |
+          echo "${{ secrets.APPLE_CERTIFICATE_P12 }}" | base64 --decode > certificate.p12
+          security create-keychain -p "" build.keychain
+          security import certificate.p12 \
+            -k build.keychain \
+            -P "${{ secrets.APPLE_CERTIFICATE_PASSWORD }}" \
+            -T /usr/bin/codesign
+          security list-keychains -s build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+          security set-key-partition-list \
+            -S apple-tool:,apple: -s -k "" build.keychain
+
+      - name: Export archive
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath "MactrixApp/Mactrix.xcarchive" \
+            -exportPath ./export \
+            -exportOptionsPlist exportOptions.plist
+
+      - name: Notarize
+        run: |
+          xcrun notarytool submit ./export/Mactrix.dmg \
+            --key-id "${{ secrets.APPLE_KEY_ID }}" \
+            --key <(echo "${{ secrets.APPLE_KEY_P8 }}") \
+            --issuer "${{ secrets.APPLE_ISSUER_ID }}" \
+            --wait
+
+      - name: Staple
+        run: xcrun stapler staple ./export/Mactrix.dmg
+
+      - name: Upload notarized artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mactrix-notarized
+          path: ./export/Mactrix.dmg
+          retention-days: 14

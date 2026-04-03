@@ -17,7 +17,7 @@ jobs:
   notarize:
     runs-on: macos-15
     steps:
-      - name: Checkout (for exportOptions.plist)
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set inputs
@@ -56,27 +56,38 @@ jobs:
           security set-key-partition-list \
             -S apple-tool:,apple: -s -k "" build.keychain
 
-      - name: Export archive
+      - name: Show unzipped contents
+        run: find MactrixApp -maxdepth 3 -type f -o -type d | head -30
+
+      - name: Sign app
         run: |
-          xcodebuild -exportArchive \
-            -archivePath "MactrixApp/Mactrix.xcarchive" \
-            -exportPath ./export \
-            -exportOptionsPlist exportOptions.plist
+          codesign --deep --force --verify --verbose \
+            --sign "Developer ID Application: Andrew Beresford (4ZDNN637A8)" \
+            --options runtime \
+            MactrixApp/Mactrix.app
+
+      - name: Create DMG
+        run: |
+          mkdir -p dist
+          hdiutil create -volname Mactrix \
+            -srcfolder MactrixApp/Mactrix.app \
+            -ov -format UDZO \
+            dist/Mactrix.dmg
 
       - name: Notarize
         run: |
-          xcrun notarytool submit ./export/Mactrix.dmg \
+          xcrun notarytool submit dist/Mactrix.dmg \
             --key-id "${{ secrets.APPLE_KEY_ID }}" \
             --key <(echo "${{ secrets.APPLE_KEY_P8 }}") \
             --issuer "${{ secrets.APPLE_ISSUER_ID }}" \
             --wait
 
       - name: Staple
-        run: xcrun stapler staple ./export/Mactrix.dmg
+        run: xcrun stapler staple dist/Mactrix.dmg
 
       - name: Upload notarized artifact
         uses: actions/upload-artifact@v4
         with:
           name: Mactrix-notarized-${{ steps.inputs.outputs.tag }}
-          path: ./export/Mactrix.dmg
+          path: dist/Mactrix.dmg
           retention-days: 14

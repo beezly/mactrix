@@ -57,7 +57,7 @@ jobs:
             -S apple-tool:,apple: -s -k "" build.keychain
 
       - name: Show unzipped contents
-        run: find MactrixApp -maxdepth 3 -type f -o -type d | head -30
+        run: find MactrixApp -maxdepth 3 | head -30
 
       - name: Sign app
         run: |
@@ -74,11 +74,15 @@ jobs:
             -ov -format UDZO \
             dist/Mactrix.dmg
 
+      - name: Write notarization key
+        run: |
+          echo "${{ secrets.APPLE_KEY_P8 }}" > /tmp/notarize_key.p8
+
       - name: Notarize
         run: |
           xcrun notarytool submit dist/Mactrix.dmg \
             --key-id "${{ secrets.APPLE_KEY_ID }}" \
-            --key <(echo "${{ secrets.APPLE_KEY_P8 }}") \
+            --key /tmp/notarize_key.p8 \
             --issuer "${{ secrets.APPLE_ISSUER_ID }}" \
             --wait
 
@@ -91,3 +95,7 @@ jobs:
           name: Mactrix-notarized-${{ steps.inputs.outputs.tag }}
           path: dist/Mactrix.dmg
           retention-days: 14
+
+      - name: Clean up key
+        if: always()
+        run: rm -f /tmp/notarize_key.p8

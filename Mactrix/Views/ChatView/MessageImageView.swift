@@ -96,6 +96,7 @@ struct MessageImageView: View {
             let cacheKey = NSString(string: content.source.url())
             if let cached = MatrixClient.imageCache.object(forKey: cacheKey) {
                 image = Image(nsImage: cached)
+                return
             }
 
             do {
